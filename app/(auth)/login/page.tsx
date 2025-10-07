@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
-import { getSupabaseServerClient } from "../../lib/supabase/server";
+import { createClient } from "../../lib/supabase/server";
 import { AuthForm } from "../../components/auth-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
-  const supabase = getSupabaseServerClient();
+   const supabase = createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
