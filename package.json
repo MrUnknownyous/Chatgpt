@@ -9,6 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    // package.json -> dependencies
+"@supabase/ssr": "^0.5.0",
+
     "@dnd-kit/core": "^7.0.2",
 "@dnd-kit/sortable": "^7.0.2",
 "@dnd-kit/modifiers": "^7.0.0",
