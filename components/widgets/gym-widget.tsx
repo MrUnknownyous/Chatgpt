@@ -1,15 +1,42 @@
 "use client";
 
-import useSWR from "swr";
+import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+const WORKOUTS_QUERY_KEY = ["workouts"] as const;
+
+interface WorkoutSet {
+  lift: string;
+  weight: number | null;
+  reps: number;
+}
+
+interface Workout {
+  id: string;
+  ts: string | null;
+  bodypart: string | null;
+  notes: string | null;
+  workout_sets?: WorkoutSet[];
+}
+
+async function fetchWorkouts() {
+  const response = await fetch("/api/workouts");
+  if (!response.ok) {
+    throw new Error("Failed to load workouts");
+  }
+
+  return (await response.json()) as { workouts: Workout[] };
+}
 
 export function GymWidget() {
-  const { data } = useSWR<{ workouts: any[] }>("/api/workouts", fetcher, {
-    refreshInterval: 120_000,
+  const workoutsQuery = useQuery({
+    queryKey: WORKOUTS_QUERY_KEY,
+    queryFn: fetchWorkouts,
+    refetchInterval: 120_000,
+    staleTime: 60_000,
   });
-  const workouts = data?.workouts ?? [];
+
+  const workouts = workoutsQuery.data?.workouts ?? [];
 
   return (
     <div className="space-y-4">
@@ -44,7 +71,7 @@ export function GymWidget() {
               )}
             </div>
             <div className="space-y-1 text-xs">
-              {(workout.workout_sets || []).map((set: any, idx: number) => (
+              {(workout.workout_sets || []).map((set, idx) => (
                 <div
                   key={`${workout.id}-${idx}`}
                   className="flex items-center justify-between rounded-md bg-muted/60 px-3 py-1"

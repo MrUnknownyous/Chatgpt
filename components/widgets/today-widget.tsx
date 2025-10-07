@@ -1,10 +1,25 @@
 "use client";
 
-import useSWR from "swr";
+import { useQuery } from "@tanstack/react-query";
 import { parseISO } from "date-fns";
 import { useDashboard } from "../dashboard-context";
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+const TASKS_QUERY_KEY = ["tasks"] as const;
+
+interface Task {
+  id: string;
+  due_date: string | null;
+  status: "todo" | "doing" | "done";
+}
+
+async function fetchTasks() {
+  const response = await fetch("/api/tasks");
+  if (!response.ok) {
+    throw new Error("Failed to load tasks");
+  }
+
+  return (await response.json()) as { tasks: Task[] };
+}
 
 export function TodayWidget() {
   const { tz } = useDashboard();
@@ -18,11 +33,14 @@ export function TodayWidget() {
     minute: "2-digit",
   });
 
-  const { data: tasksData } = useSWR<{ tasks: any[] }>("/api/tasks", fetcher, {
-    refreshInterval: 60_000,
+  const tasksQuery = useQuery({
+    queryKey: TASKS_QUERY_KEY,
+    queryFn: fetchTasks,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 
-  const openTasks = tasksData?.tasks ?? [];
+  const openTasks = tasksQuery.data?.tasks ?? [];
   const dueToday = openTasks.filter((task) => {
     if (!task.due_date) return false;
     const due = parseISO(task.due_date);
@@ -80,8 +98,7 @@ function StatCard({
       ? "bg-destructive/10 text-destructive"
       : "bg-secondary/60 text-foreground";
   return (
-    <div className={`rounded-lg ${toneClass} px-4 py-3`}
-    >
+    <div className={`rounded-lg ${toneClass} px-4 py-3`}>
       <p className="text-xs uppercase tracking-wide text-muted-foreground">
         {label}
       </p>

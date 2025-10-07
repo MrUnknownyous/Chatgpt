@@ -1,17 +1,38 @@
 "use client";
 
-import useSWR from "swr";
+import { useQuery } from "@tanstack/react-query";
 import { parseISO, differenceInCalendarDays } from "date-fns";
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+const TASKS_QUERY_KEY = ["tasks"] as const;
+
+interface Task {
+  id: string;
+  title: string;
+  due_date: string | null;
+  status: "todo" | "doing" | "done";
+}
+
+async function fetchTasks() {
+  const response = await fetch("/api/tasks");
+  if (!response.ok) {
+    throw new Error("Failed to load tasks");
+  }
+
+  return (await response.json()) as { tasks: Task[] };
+}
 
 export function CivilWidget() {
-  const { data } = useSWR<{ tasks: any[] }>("/api/tasks", fetcher);
-  const upcoming = (data?.tasks ?? [])
+  const tasksQuery = useQuery({
+    queryKey: TASKS_QUERY_KEY,
+    queryFn: fetchTasks,
+    staleTime: 30_000,
+  });
+
+  const upcoming = (tasksQuery.data?.tasks ?? [])
     .filter((task) => task.due_date && task.status !== "done")
     .map((task) => ({
       ...task,
-      days: differenceInCalendarDays(parseISO(task.due_date), new Date()),
+      days: differenceInCalendarDays(parseISO(task.due_date!), new Date()),
     }))
     .sort((a, b) => a.days - b.days)
     .slice(0, 5);

@@ -1,11 +1,45 @@
 "use client";
 
 import { useState } from "react";
-import useSWR from "swr";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Button } from "../ui/button";
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+interface MoodEntry {
+  id: string;
+  ts: string;
+  score: number;
+  note: string | null;
+}
+
+const MOODS_QUERY_KEY = ["moods"] as const;
+
+async function fetchMoods() {
+  const response = await fetch("/api/moods");
+  if (!response.ok) {
+    throw new Error("Failed to load moods");
+  }
+
+  return (await response.json()) as { moods: MoodEntry[] };
+}
+
+async function postMood(payload: { score: number; note: string }) {
+  const response = await fetch("/api/moods", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to log mood");
+  }
+
+  return response.json();
+}
 
 const moodsScale = [
   { score: 1, label: "Low" },
@@ -16,22 +50,29 @@ const moodsScale = [
 ];
 
 export function MoodWidget() {
-  const { data, mutate } = useSWR<{ moods: any[] }>("/api/moods", fetcher, {
-    refreshInterval: 120_000,
-  });
   const [note, setNote] = useState("");
+  const queryClient = useQueryClient();
+
+  const moodsQuery = useQuery({
+    queryKey: MOODS_QUERY_KEY,
+    queryFn: fetchMoods,
+    refetchInterval: 120_000,
+    staleTime: 60_000,
+  });
+
+  const logMoodMutation = useMutation({
+    mutationFn: postMood,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: MOODS_QUERY_KEY });
+    },
+  });
 
   async function logMood(score: number) {
-    await fetch("/api/moods", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ score, note }),
-    });
+    await logMoodMutation.mutateAsync({ score, note });
     setNote("");
-    mutate();
   }
 
-  const moods = data?.moods ?? [];
+  const moods = moodsQuery.data?.moods ?? [];
 
   return (
     <div className="space-y-4">
@@ -45,8 +86,15 @@ export function MoodWidget() {
         />
         <div className="flex flex-wrap gap-2">
           {moodsScale.map((mood) => (
-            <Button key={mood.score} size="sm" onClick={() => logMood(mood.score)}>
-              {mood.label}
+            <Button
+              key={mood.score}
+              size="sm"
+              onClick={() => {
+                void logMood(mood.score);
+              }}
+              disabled={logMoodMutation.isPending}
+            >
+              {logMoodMutation.isPending ? "Logging" : mood.label}
             </Button>
           ))}
         </div>

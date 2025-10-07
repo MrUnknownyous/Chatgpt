@@ -1,29 +1,84 @@
 "use client";
 
-import useSWR from "swr";
+import { useMemo } from "react";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Button } from "../ui/button";
 import { format } from "date-fns";
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+const HABITS_QUERY_KEY = ["habits"] as const;
+
+interface Habit {
+  id: string;
+  name: string;
+  goal_per_day: number;
+}
+
+interface HabitLog {
+  id: string;
+  habit_id: string;
+  ts: string;
+  qty: number;
+}
+
+async function fetchHabits() {
+  const response = await fetch("/api/habits");
+  if (!response.ok) {
+    throw new Error("Failed to load habits");
+  }
+
+  return (await response.json()) as { habits: Habit[]; logs: HabitLog[] };
+}
+
+async function createHabitLog(payload: { habit_id: string; qty: number }) {
+  const response = await fetch("/api/habits/log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to log habit");
+  }
+
+  return response.json();
+}
 
 export function HabitsWidget() {
-  const { data, mutate } = useSWR<{ habits: any[]; logs: any[] }>(
-    "/api/habits",
-    fetcher,
-    { refreshInterval: 60_000 }
-  );
+  const queryClient = useQueryClient();
 
-  const habits = data?.habits ?? [];
-  const logs = data?.logs ?? [];
+  const habitsQuery = useQuery({
+    queryKey: HABITS_QUERY_KEY,
+    queryFn: fetchHabits,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+
+  const logHabitMutation = useMutation({
+    mutationFn: createHabitLog,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: HABITS_QUERY_KEY });
+    },
+  });
+
+  const habits = habitsQuery.data?.habits ?? [];
+  const logs = habitsQuery.data?.logs ?? [];
   const todayKey = new Date().toISOString().slice(0, 10);
 
-  async function logHabit(habitId: string) {
-    await fetch("/api/habits/log", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ habit_id: habitId, qty: 1 }),
-    });
-    mutate();
+  const logsByHabit = useMemo(() => {
+    return logs.reduce<Record<string, HabitLog[]>>((acc, log) => {
+      const list = acc[log.habit_id] ?? [];
+      list.push(log);
+      acc[log.habit_id] = list;
+      return acc;
+    }, {});
+  }, [logs]);
+
+  async function handleLog(habitId: string) {
+    await logHabitMutation.mutateAsync({ habit_id: habitId, qty: 1 });
   }
 
   return (
@@ -36,14 +91,15 @@ export function HabitsWidget() {
       )}
       <div className="space-y-3">
         {habits.map((habit) => {
-          const habitLogs = logs.filter((log) => log.habit_id === habit.id);
+          const habitLogs = logsByHabit[habit.id] ?? [];
           const todayCount = habitLogs
             .filter((log) => (log.ts ?? "").slice(0, 10) === todayKey)
             .reduce((acc, log) => acc + (log.qty ?? 1), 0);
           const completionRatio = Math.min(
             1,
-            todayCount / (habit.goal_per_day || 1)
+            todayCount / Math.max(habit.goal_per_day || 1, 1)
           );
+
           return (
             <div
               key={habit.id}
@@ -56,8 +112,14 @@ export function HabitsWidget() {
                     Goal: {habit.goal_per_day} per day • Today: {todayCount}
                   </p>
                 </div>
-                <Button size="sm" onClick={() => logHabit(habit.id)}>
-                  +1
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    void handleLog(habit.id);
+                  }}
+                  disabled={logHabitMutation.isPending}
+                >
+                  {logHabitMutation.isPending ? "Logging" : "+1"}
                 </Button>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
