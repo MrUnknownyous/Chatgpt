@@ -4,7 +4,7 @@ import { Providers } from "@/components/providers";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Second Brain Dashboard",
+  title: "Life Dashboard",
   description: "Notion-style personal command center",
 };
 

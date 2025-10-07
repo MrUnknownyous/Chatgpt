@@ -1,6 +1,6 @@
-# Second Brain Dashboard
+# Life Dashboard
 
-A secure, Notion-inspired personal operating system built with Next.js 14, Supabase, Tailwind CSS, shadcn/ui primitives, and SWR. Designed to deploy on Vercel with a Supabase backend and embeddable at `dash.bansalpatel.com` (use the `/embed` route for clean iframes).
+A secure, Notion-inspired personal operating system built with Next.js 14, Supabase, Tailwind CSS, shadcn/ui primitives, and TanStack Query. Designed to deploy on Vercel with a Supabase backend and embeddable at `dash.bansalpatel.com` (use the `/embed` route for clean iframes).
 
 ## Getting started
 
@@ -22,7 +22,7 @@ A secure, Notion-inspired personal operating system built with Next.js 14, Supab
 
 ## Features
 
-- Supabase Auth with passwordless magic links (Cloudflare Access friendly) and middleware enforced routes.
+- Supabase Auth with passwordless magic links (Cloudflare Access friendly) and middleware enforced routes powered by `@supabase/ssr`.
 - Drag-and-drop configurable dashboard tiles persisted per user profile.
 - Widgets for daily overview, tasks, habits, mood logging, training logs, civic admin, and external embeds.
 - `/embed` layout optimized for iframe embedding on the solo website.
